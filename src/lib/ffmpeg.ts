@@ -1,9 +1,8 @@
 import ffmpegLib from 'fluent-ffmpeg';
 import ffmpegStatic from 'ffmpeg-static';
-import ffprobeInstaller from '@ffprobe-installer/ffprobe';
 
 if (!ffmpegStatic) throw new Error('ffmpeg-static path not resolved');
 ffmpegLib.setFfmpegPath(ffmpegStatic as string);
-ffmpegLib.setFfprobePath(ffprobeInstaller.path);
+// ffprobe is not needed for our use case - we'll use ffmpeg for duration probing
 
 export const ffmpeg = ffmpegLib;

@@ -70,8 +70,10 @@ router.post('/', upload.single('video'), async (req, res) => {
       const fileName = `frame-${String(i + 1).padStart(6, '0')}.${ext}`;
       const key = `${PREFIX}/${jobId}/${fileName}`;
       const frameBuf = await extractFrameBuffer(req.file!.buffer, t, ext as 'jpg' | 'png' | 'webp', quality);
+      console.log(`📸 Extracted frame ${i + 1}/${points.length} at ${t}s - buffer size: ${frameBuf.length} bytes`);
       await putBuffer(BUCKET, key, frameBuf, contentType);
-      const url = await presign(BUCKET, key, 3600);
+      const url = await presign(BUCKET, key, 86400); // 24 hours
+      console.log(`🔗 Generated URL for frame ${i + 1}: ${url.substring(0, 100)}...`);
       urls.push(url);
     }
 

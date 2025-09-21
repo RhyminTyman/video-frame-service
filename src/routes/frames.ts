@@ -3,6 +3,7 @@ import multer from 'multer';
 import Archiver from 'archiver';
 import { ffmpeg } from '../lib/ffmpeg.js';
 import { bufferToStream, collectStream, timestamps, mimeFor } from '../lib/utils.js';
+import { putBuffer, presign } from '../lib/s3.js';
 
 
 const router = Router();
@@ -18,10 +19,12 @@ const upload = multer({
   }
 });
 
-// S3 dependencies removed - using base64 response instead
+const BUCKET = process.env.S3_BUCKET!;
+const PREFIX = process.env.S3_PREFIX ?? 'frames';
 
 router.post('/', upload.single('video'), async (req, res) => {
   try {
+    if (!BUCKET) return res.status(500).json({ error: 'S3_BUCKET not configured' });
     if (!req.file) return res.status(400).json({ error: 'Upload a video using field "video"' });
 
     const q = req.query as Record<string, string | undefined>;
@@ -51,7 +54,9 @@ router.post('/', upload.single('video'), async (req, res) => {
       for (let i = 0; i < points.length; i++) {
         const t = points[i];
         const fileName = `frame-${String(i + 1).padStart(6, '0')}.${ext}`;
+        const key = `${PREFIX}/${jobId}/${fileName}`;
         const frameBuf = await extractFrameBuffer(req.file!.buffer, t, ext as 'jpg' | 'png' | 'webp', quality);
+        await putBuffer(BUCKET, key, frameBuf, contentType);
         archive.append(frameBuf, { name: fileName });
       }
       archive.finalize();
@@ -59,26 +64,18 @@ router.post('/', upload.single('video'), async (req, res) => {
     }
 
     // Normal mode: upload and presign
-    const frames: Array<{index: number, timestamp: number, data: string}> = [];
+    const urls: string[] = [];
     for (let i = 0; i < points.length; i++) {
       const t = points[i];
+      const fileName = `frame-${String(i + 1).padStart(6, '0')}.${ext}`;
+      const key = `${PREFIX}/${jobId}/${fileName}`;
       const frameBuf = await extractFrameBuffer(req.file!.buffer, t, ext as 'jpg' | 'png' | 'webp', quality);
-      const base64Data = frameBuf.toString('base64');
-      const dataUrl = `data:${contentType};base64,${base64Data}`;
-      
-      frames.push({
-        index: i + 1,
-        timestamp: t,
-        data: dataUrl
-      });
+      await putBuffer(BUCKET, key, frameBuf, contentType);
+      const url = await presign(BUCKET, key, 3600);
+      urls.push(url);
     }
 
-    res.json({ 
-      jobId, 
-      frames: frames.map(f => f.data), // For backward compatibility
-      framesWithMetadata: frames,
-      count: frames.length 
-    });
+    res.json({ jobId, frames: urls, count: urls.length });
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : String(err);
     if (errorMessage.includes('File too large')) {

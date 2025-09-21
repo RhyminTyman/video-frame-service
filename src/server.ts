@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -51,7 +51,7 @@ app.use('/api/frames', framesRouter);
 app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
 
 // Global error safety
-app.use((err: any, _req: any, res: any, _next: any) => {
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[unhandled]', err);
   res.status(500).json({ error: 'Internal error' });
 });

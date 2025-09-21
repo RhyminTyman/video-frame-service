@@ -5,6 +5,12 @@ import { ffmpeg } from '../lib/ffmpeg.js';
 import { bufferToStream, collectStream, timestamps, mimeFor } from '../lib/utils.js';
 import { putBuffer, presign } from '../lib/s3.js';
 
+interface FFmpegProbeData {
+  format: {
+    duration?: number;
+  };
+}
+
 const router = Router();
 
 const maxUpload = Number(process.env.MAX_UPLOAD_BYTES ?? 209715200); // 200MB default
@@ -34,7 +40,7 @@ router.post('/', upload.single('video'), async (req, res) => {
 
     // Probe duration
     const durationSec = await new Promise<number>((resolve, reject) => {
-      ffmpeg().input(bufferToStream(req.file!.buffer)).ffprobe((err: any, data: any) => {
+      ffmpeg().input(bufferToStream(req.file!.buffer)).ffprobe((err: Error | null, data: FFmpegProbeData) => {
         if (err) return reject(err);
         const dur = data.format.duration ?? 0;
         resolve(Math.floor(dur));
@@ -52,14 +58,14 @@ router.post('/', upload.single('video'), async (req, res) => {
       res.setHeader('Content-Type', 'application/zip');
       res.setHeader('Content-Disposition', `attachment; filename="${jobId}-frames.zip"`);
       const archive = Archiver('zip', { zlib: { level: 9 } });
-      archive.on('error', (e: any) => res.status(500).end(`zip error: ${e.message}`));
+      archive.on('error', (e: Error) => res.status(500).end(`zip error: ${e.message}`));
       archive.pipe(res);
 
       for (let i = 0; i < points.length; i++) {
         const t = points[i];
         const fileName = `frame-${String(i + 1).padStart(6, '0')}.${ext}`;
         const key = `${PREFIX}/${jobId}/${fileName}`;
-        const frameBuf = await extractFrameBuffer(req.file!.buffer, t, ext as any, quality);
+        const frameBuf = await extractFrameBuffer(req.file!.buffer, t, ext as 'jpg' | 'png' | 'webp', quality);
         await putBuffer(BUCKET, key, frameBuf, contentType);
         archive.append(frameBuf, { name: fileName });
       }
@@ -73,19 +79,20 @@ router.post('/', upload.single('video'), async (req, res) => {
       const t = points[i];
       const fileName = `frame-${String(i + 1).padStart(6, '0')}.${ext}`;
       const key = `${PREFIX}/${jobId}/${fileName}`;
-      const frameBuf = await extractFrameBuffer(req.file!.buffer, t, ext as any, quality);
+      const frameBuf = await extractFrameBuffer(req.file!.buffer, t, ext as 'jpg' | 'png' | 'webp', quality);
       await putBuffer(BUCKET, key, frameBuf, contentType);
       const url = await presign(BUCKET, key, 3600);
       urls.push(url);
     }
 
     res.json({ jobId, frames: urls, count: urls.length });
-  } catch (err: any) {
-    if (String(err?.message || '').includes('File too large')) {
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    if (errorMessage.includes('File too large')) {
       return res.status(413).json({ error: `File too large. Max ${maxUpload} bytes.` });
     }
     console.error(err);
-    res.status(500).json({ error: err?.message ?? 'Failed to process video' });
+    res.status(500).json({ error: errorMessage || 'Failed to process video' });
   }
 });
 
@@ -105,6 +112,6 @@ async function extractFrameBuffer(videoBuf: Buffer, atSec: number, ext: 'jpg'|'p
       .on('error', reject);
 
     const stream = cmd.pipe();
-    collectStream(stream as any).then(resolve).catch(reject);
+    collectStream(stream as NodeJS.ReadableStream).then(resolve).catch(reject);
   });
 }

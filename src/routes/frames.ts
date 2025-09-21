@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import multer from 'multer';
 import Archiver from 'archiver';
-import { ffmpeg } from '../lib/ffmpeg';
-import { bufferToStream, collectStream, timestamps, mimeFor } from '../lib/utils';
-import { putBuffer, presign } from '../lib/s3';
+import { ffmpeg } from '../lib/ffmpeg.js';
+import { bufferToStream, collectStream, timestamps, mimeFor } from '../lib/utils.js';
+import { putBuffer, presign } from '../lib/s3.js';
 
 const router = Router();
 

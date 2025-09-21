@@ -6,8 +6,8 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 
 import framesRouter from './routes/frames.js';
-import { apiKeyAuth } from './middleware/apiKey.js';
-import { hmacAuth } from './middleware/hmac.js';
+// import { apiKeyAuth } from './middleware/apiKey.js';
+// import { hmacAuth } from './middleware/hmac.js';
 
 const PORT = Number(process.env.PORT ?? 3001);
 const ORIGIN = process.env.CORS_ORIGIN ?? '*';

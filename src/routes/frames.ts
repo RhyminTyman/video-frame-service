@@ -34,7 +34,7 @@ router.post('/', upload.single('video'), async (req, res) => {
 
     // Probe duration
     const durationSec = await new Promise<number>((resolve, reject) => {
-      ffmpeg().input(bufferToStream(req.file!.buffer)).ffprobe((err, data) => {
+      ffmpeg().input(bufferToStream(req.file!.buffer)).ffprobe((err: any, data: any) => {
         if (err) return reject(err);
         const dur = data.format.duration ?? 0;
         resolve(Math.floor(dur));
@@ -52,7 +52,7 @@ router.post('/', upload.single('video'), async (req, res) => {
       res.setHeader('Content-Type', 'application/zip');
       res.setHeader('Content-Disposition', `attachment; filename="${jobId}-frames.zip"`);
       const archive = Archiver('zip', { zlib: { level: 9 } });
-      archive.on('error', (e) => res.status(500).end(`zip error: ${e.message}`));
+      archive.on('error', (e: any) => res.status(500).end(`zip error: ${e.message}`));
       archive.pipe(res);
 
       for (let i = 0; i < points.length; i++) {
@@ -105,6 +105,6 @@ async function extractFrameBuffer(videoBuf: Buffer, atSec: number, ext: 'jpg'|'p
       .on('error', reject);
 
     const stream = cmd.pipe();
-    collectStream(stream).then(resolve).catch(reject);
+    collectStream(stream as any).then(resolve).catch(reject);
   });
 }

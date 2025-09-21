@@ -3,7 +3,7 @@ import multer from 'multer';
 import Archiver from 'archiver';
 import { ffmpeg } from '../lib/ffmpeg.js';
 import { bufferToStream, collectStream, timestamps, mimeFor } from '../lib/utils.js';
-import { putBuffer, presign } from '../lib/s3.js';
+import { putBuffer } from '../lib/s3.js';
 
 
 const router = Router();
@@ -72,8 +72,8 @@ router.post('/', upload.single('video'), async (req, res) => {
       const frameBuf = await extractFrameBuffer(req.file!.buffer, t, ext as 'jpg' | 'png' | 'webp', quality);
       console.log(`📸 Extracted frame ${i + 1}/${points.length} at ${t}s - buffer size: ${frameBuf.length} bytes`);
       await putBuffer(BUCKET, key, frameBuf, contentType);
-      const url = await presign(BUCKET, key, 86400); // 24 hours
-      console.log(`🔗 Generated URL for frame ${i + 1}: ${url.substring(0, 100)}...`);
+      const url = `https://${BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+      console.log(`🔗 Generated public URL for frame ${i + 1}: ${url}`);
       urls.push(url);
     }
 
